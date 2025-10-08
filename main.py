@@ -792,19 +792,28 @@ async def anime_total_parts_handler(message: types.Message, state: FSMContext):
 @dp.message_handler(content_types=["photo", "video", "document"], state=AddAnimeStates.waiting_for_poster)
 async def anime_poster_handler(message: types.Message, state: FSMContext):
     file_id = None
+    poster_type = None  # ✅ yangi maydon
+
     if message.photo:
         file_id = message.photo[-1].file_id
+        poster_type = "photo"
     elif message.video:
         file_id = message.video.file_id
+        poster_type = "video"
     elif message.document:
         file_id = message.document.file_id
+        poster_type = "document"
 
     caption = message.caption if message.caption else ""
-    await state.update_data(poster_file_id=file_id, caption=caption, parts_file_ids=[])
+    await state.update_data(
+        poster_file_id=file_id,
+        poster_type=poster_type,  # ✅ saqlash
+        caption=caption,
+        parts_file_ids=[]
+    )
 
     await message.answer("📥 Endi qismlarni yuboring (video/file). Oxirida /done yuboring.")
     await AddAnimeStates.waiting_for_parts.set()
-
 
 @dp.message_handler(content_types=["video", "document"], state=AddAnimeStates.waiting_for_parts)
 async def anime_parts_handler(message: types.Message, state: FSMContext):
@@ -842,8 +851,13 @@ async def anime_done_handler(message: types.Message, state: FSMContext):
 ➤ Ovoz berdi: {dubbed_by}
 ──────────────────────"""
 
-    await add_anime(code, title, poster_file_id, parts_file_ids, caption, genre, season, quality, channel_name, dubbed_by, total_parts)
+    poster_type = data.get("poster_type", "photo")  # default photo
 
+    await add_anime(
+        code, title, poster_file_id, parts_file_ids, caption,
+        genre, season, quality, channel_name, dubbed_by, total_parts,
+        poster_type=poster_type  # ✅ qo'shish
+    )
     await message.answer(
         f"✅ Anime saqlandi!\n\n"
         f"📌 Kod: <b>{code}</b>\n"
@@ -857,15 +871,7 @@ async def anime_done_handler(message: types.Message, state: FSMContext):
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# === ➤ Post qilish (Endi bazaga mos) ===
-@dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
-async def start_post_process(message: types.Message):
-    await PostStates.waiting_for_code.set()
-    await message.answer(
-        "🔢 Qaysi anime KODini kanalga yubormoqchisiz?\nMasalan: `147`",
-        reply_markup=control_keyboard()
-    )
-
+# === ➤ Post qilish (To'liq moslangan versiya) ===
 @dp.message_handler(state=PostStates.waiting_for_code)
 async def send_post_by_code(message: types.Message, state: FSMContext):
     if message.text == "📡 Boshqarish":
@@ -895,19 +901,23 @@ async def send_post_by_code(message: types.Message, state: FSMContext):
     successful, failed = 0, 0
     for ch in MAIN_CHANNELS:
         try:
-            # Poster faylini yuborish
-            if kino['poster_file_id']:
-                if kino.get('caption'):
-                    await bot.send_photo(ch, kino['poster_file_id'], caption=kino['caption'], reply_markup=download_btn)
-                else:
-                    await bot.send_photo(ch, kino['poster_file_id'], reply_markup=download_btn)
-            # Agar poster video yoki document bo‘lsa
-            elif kino['poster_file_id']:
-                await bot.send_document(ch, kino['poster_file_id'], caption=kino.get('caption', ''), reply_markup=download_btn)
+            file_id = kino['poster_file_id']
+            caption = kino.get('caption', '')
+
+            # Fayl turini aniqlash — `poster_type` mavjud bo'lsa undan foydalanamiz
+            poster_type = kino.get('poster_type')
+
+            if poster_type == "video":
+                await bot.send_video(ch, file_id, caption=caption, reply_markup=download_btn)
+            elif poster_type == "document":
+                await bot.send_document(ch, file_id, caption=caption, reply_markup=download_btn)
+            else:
+                # Default: photo (Telegram ko'pincha rasm sifatida saqlaydi)
+                await bot.send_photo(ch, file_id, caption=caption, reply_markup=download_btn)
 
             successful += 1
         except Exception as e:
-            print(f"Xato: {e}")
+            print(f"Xato kanal {ch} uchun: {e}")
             failed += 1
 
     await message.answer(
