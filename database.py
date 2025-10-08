@@ -42,7 +42,13 @@ async def init_db(retries: int = 5, delay: int = 2):
                         post_count INTEGER,
                         poster_file_id TEXT,
                         caption TEXT,
-                        parts_file_ids TEXT
+                        parts_file_ids TEXT,
+                        genre TEXT,
+                        season TEXT,
+                        quality TEXT,
+                        channel_name TEXT,
+                        dubbed_by TEXT,
+                        total_parts INTEGER
                     );
                 """)
                 # === Statistika ===
@@ -118,18 +124,24 @@ async def get_today_users():
 
 
 # === Anime kodlari ===
-async def add_anime(code, title, poster_file_id, parts_file_ids, caption=""):
+async def add_anime(code, title, poster_file_id, parts_file_ids, caption="", genre="", season="1", quality="", channel_name="", dubbed_by="", total_parts=0):
     pool = await get_conn()
     async with pool.acquire() as conn:
         await conn.execute("""
-            INSERT INTO kino_codes (code, title, poster_file_id, caption, parts_file_ids, post_count)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO kino_codes (code, title, poster_file_id, caption, parts_file_ids, post_count, genre, season, quality, channel_name, dubbed_by, total_parts)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (code) DO UPDATE SET
                 title = EXCLUDED.title,
                 poster_file_id = EXCLUDED.poster_file_id,
                 caption = EXCLUDED.caption,
-                parts_file_ids = EXCLUDED.parts_file_ids;
-        """, code, title, poster_file_id, caption, json.dumps(parts_file_ids), len(parts_file_ids))
+                parts_file_ids = EXCLUDED.parts_file_ids,
+                genre = EXCLUDED.genre,
+                season = EXCLUDED.season,
+                quality = EXCLUDED.quality,
+                channel_name = EXCLUDED.channel_name,
+                dubbed_by = EXCLUDED.dubbed_by,
+                total_parts = EXCLUDED.total_parts;
+        """, code, title, poster_file_id, caption, json.dumps(parts_file_ids), len(parts_file_ids), genre, season, quality, channel_name, dubbed_by, total_parts)
         await conn.execute("""
             INSERT INTO stats (code) VALUES ($1)
             ON CONFLICT DO NOTHING
@@ -141,7 +153,8 @@ async def get_kino_by_code(code):
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
             SELECT code, title, poster_file_id, caption, parts_file_ids,
-                   post_count, channel, message_id
+                   post_count, channel, message_id, genre, season, quality, 
+                   channel_name, dubbed_by, total_parts
             FROM kino_codes
             WHERE code = $1
         """, code)
@@ -157,7 +170,8 @@ async def get_all_codes():
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT code, title, poster_file_id, caption, parts_file_ids,
-                   post_count, channel, message_id
+                   post_count, channel, message_id, genre, season, quality,
+                   channel_name, dubbed_by, total_parts
             FROM kino_codes
         """)
         result = []
@@ -246,8 +260,9 @@ async def add_part_to_anime(code: str, file_id: str):
         parts = json.loads(row["parts_file_ids"]) if row["parts_file_ids"] else []
         parts.append(file_id)
         await conn.execute(
-            "UPDATE kino_codes SET parts_file_ids=$1 WHERE code=$2",
+            "UPDATE kino_codes SET parts_file_ids=$1, post_count=$2 WHERE code=$3",
             json.dumps(parts),
+            len(parts),
             code
         )
 
@@ -262,8 +277,9 @@ async def delete_part_from_anime(code: str, part_number: int):
             return False
         parts.pop(part_number - 1)  # 1-asosli → 0-asosli
         await conn.execute(
-            "UPDATE kino_codes SET parts_file_ids=$1 WHERE code=$2",
+            "UPDATE kino_codes SET parts_file_ids=$1, post_count=$2 WHERE code=$3",
             json.dumps(parts),
+            len(parts),
             code
         )
         return True
