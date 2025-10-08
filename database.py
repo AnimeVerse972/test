@@ -84,6 +84,7 @@ async def init_db(retries: int = 5, delay: int = 2):
                 await conn.execute("ALTER TABLE kino_codes ADD COLUMN IF NOT EXISTS channel_name TEXT;")
                 await conn.execute("ALTER TABLE kino_codes ADD COLUMN IF NOT EXISTS dubbed_by TEXT;")
                 await conn.execute("ALTER TABLE kino_codes ADD COLUMN IF NOT EXISTS total_parts INTEGER;")
+                await conn.execute("ALTER TABLE kino_codes ADD COLUMN IF NOT EXISTS poster_type TEXT;")
 
             print("[DB] Ulanish muvaffaqiyatli")
             break
@@ -139,12 +140,15 @@ async def get_today_users():
 
 
 # === Anime kodlari ===
-async def add_anime(code, title, poster_file_id, parts_file_ids, caption="", genre="", season="1", quality="", channel_name="", dubbed_by="", total_parts=0):
+async def add_anime(code, title, poster_file_id, parts_file_ids, caption="", genre="", season="1", quality="", channel_name="", dubbed_by="", total_parts=0, poster_type="photo"):
     pool = await get_conn()
     async with pool.acquire() as conn:
         await conn.execute("""
-            INSERT INTO kino_codes (code, title, poster_file_id, caption, parts_file_ids, post_count, genre, season, quality, channel_name, dubbed_by, total_parts)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            INSERT INTO kino_codes (
+                code, title, poster_file_id, caption, parts_file_ids, post_count,
+                genre, season, quality, channel_name, dubbed_by, total_parts, poster_type
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             ON CONFLICT (code) DO UPDATE SET
                 title = EXCLUDED.title,
                 poster_file_id = EXCLUDED.poster_file_id,
@@ -155,8 +159,9 @@ async def add_anime(code, title, poster_file_id, parts_file_ids, caption="", gen
                 quality = EXCLUDED.quality,
                 channel_name = EXCLUDED.channel_name,
                 dubbed_by = EXCLUDED.dubbed_by,
-                total_parts = EXCLUDED.total_parts;
-        """, code, title, poster_file_id, caption, json.dumps(parts_file_ids), len(parts_file_ids), genre, season, quality, channel_name, dubbed_by, total_parts)
+                total_parts = EXCLUDED.total_parts,
+                poster_type = EXCLUDED.poster_type;
+        """, code, title, poster_file_id, caption, json.dumps(parts_file_ids), len(parts_file_ids), genre, season, quality, channel_name, dubbed_by, total_parts, poster_type)
         await conn.execute("""
             INSERT INTO stats (code) VALUES ($1)
             ON CONFLICT DO NOTHING
@@ -169,7 +174,7 @@ async def get_kino_by_code(code):
         row = await conn.fetchrow("""
             SELECT code, title, poster_file_id, caption, parts_file_ids,
                    post_count, channel, message_id, genre, season, quality, 
-                   channel_name, dubbed_by, total_parts
+                   channel_name, dubbed_by, total_parts, poster_type
             FROM kino_codes
             WHERE code = $1
         """, code)
