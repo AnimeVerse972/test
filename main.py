@@ -1052,19 +1052,23 @@ async def send_reklama_post(user_id, code):
 
     poster_file_id = data["poster_file_id"]
     caption = data.get("caption", "")
-    
-    # Inline tugma
+    poster_type = data.get("poster_type", "photo")  # ✅ yangi
+
     keyboard = InlineKeyboardMarkup().add(
         InlineKeyboardButton("✨Tomosha qilish✨", callback_data=f"download:{code}")
     )
 
     try:
-        if poster_file_id:
-            await bot.send_photo(user_id, poster_file_id, caption=caption, reply_markup=keyboard)
-        else:
-            # Agar poster yo'q bo'lsa, oddiy matn
+        if not poster_file_id:
             await bot.send_message(user_id, caption or "Anime tayyor!", reply_markup=keyboard)
-    except:
+        elif poster_type == "video":
+            await bot.send_video(user_id, poster_file_id, caption=caption, reply_markup=keyboard)
+        elif poster_type == "document":
+            await bot.send_document(user_id, poster_file_id, caption=caption, reply_markup=keyboard)
+        else:  # photo
+            await bot.send_photo(user_id, poster_file_id, caption=caption, reply_markup=keyboard)
+    except Exception as e:
+        print(f"Reklama post yuborishda xatolik: {e}")
         await bot.send_message(user_id, "❌ Reklama postni yuborib bo‘lmadi.")
 
 
