@@ -1,5 +1,3 @@
-
-# === IMPORTLAR ===
 import io
 import os
 import asyncio
@@ -782,7 +780,12 @@ async def anime_dubbed_handler(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=AddAnimeStates.waiting_for_total_parts)
 async def anime_total_parts_handler(message: types.Message, state: FSMContext):
-    await state.update_data(total_parts=message.text.strip())
+    try:
+        total_parts = int(message.text.strip())
+    except ValueError:
+        await message.answer("❗ Faqat butun son kiriting (masalan: 12).")
+        return
+    await state.update_data(total_parts=total_parts)  # ✅ endi int!
     await message.answer("📸 Reklama postini yuboring (rasm/video/file, caption bilan bo'lishi mumkin):")
     await AddAnimeStates.waiting_for_poster.set()
 
