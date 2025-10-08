@@ -32,6 +32,7 @@ async def init_db(retries: int = 5, delay: int = 2):
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
                 """)
+
                 # === Anime kodlari ===
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS kino_codes (
@@ -51,6 +52,7 @@ async def init_db(retries: int = 5, delay: int = 2):
                         total_parts INTEGER
                     );
                 """)
+
                 # === Statistika ===
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS stats (
@@ -59,12 +61,14 @@ async def init_db(retries: int = 5, delay: int = 2):
                         viewed INTEGER DEFAULT 0
                     );
                 """)
+
                 # === Adminlar ===
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS admins (
                         user_id BIGINT PRIMARY KEY
                     );
                 """)
+
                 # Dastlabki admin
                 default_admins = [6486825926]
                 for admin_id in default_admins:
@@ -72,6 +76,15 @@ async def init_db(retries: int = 5, delay: int = 2):
                         "INSERT INTO admins (user_id) VALUES ($1) ON CONFLICT DO NOTHING",
                         admin_id
                     )
+
+                # === Yangi ustunlarni mavjud jadvalga qo'shish (xavfsizlik uchun) ===
+                await conn.execute("ALTER TABLE kino_codes ADD COLUMN IF NOT EXISTS genre TEXT;")
+                await conn.execute("ALTER TABLE kino_codes ADD COLUMN IF NOT EXISTS season TEXT;")
+                await conn.execute("ALTER TABLE kino_codes ADD COLUMN IF NOT EXISTS quality TEXT;")
+                await conn.execute("ALTER TABLE kino_codes ADD COLUMN IF NOT EXISTS channel_name TEXT;")
+                await conn.execute("ALTER TABLE kino_codes ADD COLUMN IF NOT EXISTS dubbed_by TEXT;")
+                await conn.execute("ALTER TABLE kino_codes ADD COLUMN IF NOT EXISTS total_parts INTEGER;")
+
             print("[DB] Ulanish muvaffaqiyatli")
             break
         except Exception as e:
@@ -107,11 +120,13 @@ async def add_user(user_id):
             "INSERT INTO users (user_id) VALUES ($1) ON CONFLICT DO NOTHING", user_id
         )
 
+
 async def get_user_count():
     pool = await get_conn()
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT COUNT(*) FROM users")
         return row[0]
+
 
 async def get_today_users():
     pool = await get_conn()
@@ -206,6 +221,7 @@ async def increment_stat(code, field):
                 UPDATE stats SET {field} = {field} + 1 WHERE code = $1
             """, code)
 
+
 async def get_code_stat(code):
     pool = await get_conn()
     async with pool.acquire() as conn:
@@ -230,6 +246,7 @@ async def get_all_admins():
         rows = await conn.fetch("SELECT user_id FROM admins")
         return {row["user_id"] for row in rows}
 
+
 async def add_admin(user_id: int):
     pool = await get_conn()
     async with pool.acquire() as conn:
@@ -237,6 +254,7 @@ async def add_admin(user_id: int):
             "INSERT INTO admins (user_id) VALUES ($1) ON CONFLICT DO NOTHING",
             user_id
         )
+
 
 async def remove_admin(user_id: int):
     pool = await get_conn()
@@ -257,7 +275,7 @@ async def add_part_to_anime(code: str, file_id: str):
     pool = await get_conn()
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT parts_file_ids FROM kino_codes WHERE code=$1", code)
-        parts = json.loads(row["parts_file_ids"]) if row["parts_file_ids"] else []
+        parts = json.loads(row["parts_file_ids"]) if row and row["parts_file_ids"] else []
         parts.append(file_id)
         await conn.execute(
             "UPDATE kino_codes SET parts_file_ids=$1, post_count=$2 WHERE code=$3",
@@ -265,6 +283,7 @@ async def add_part_to_anime(code: str, file_id: str):
             len(parts),
             code
         )
+
 
 async def delete_part_from_anime(code: str, part_number: int):
     pool = await get_conn()
