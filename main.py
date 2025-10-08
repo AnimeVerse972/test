@@ -120,6 +120,12 @@ class KanalStates(StatesGroup):
 class AddAnimeStates(StatesGroup):
     waiting_for_code = State()
     waiting_for_title = State()
+    waiting_for_genre = State()
+    waiting_for_season = State()
+    waiting_for_quality = State()
+    waiting_for_channel_name = State()
+    waiting_for_dubbed_by = State()
+    waiting_for_total_parts = State()
     waiting_for_poster = State()
     waiting_for_parts = State()
 
@@ -735,9 +741,50 @@ async def anime_code_handler(message: types.Message, state: FSMContext):
 @dp.message_handler(state=AddAnimeStates.waiting_for_title)
 async def anime_title_handler(message: types.Message, state: FSMContext):
     await state.update_data(title=message.text.strip())
-    await message.answer("📸 Reklama postini yuboring (rasm/video/file, caption bilan bo‘lishi mumkin):")
-    await AddAnimeStates.waiting_for_poster.set()
+    await message.answer("🎭 Janrini kiriting (masalan: Jangari, Sarguzasht, Fantastika):")
+    await AddAnimeStates.waiting_for_genre.set()
 
+
+@dp.message_handler(state=AddAnimeStates.waiting_for_genre)
+async def anime_genre_handler(message: types.Message, state: FSMContext):
+    await state.update_data(genre=message.text.strip())
+    await message.answer("📺 Sezonni kiriting (masalan: 1, 2, 3):")
+    await AddAnimeStates.waiting_for_season.set()
+
+
+@dp.message_handler(state=AddAnimeStates.waiting_for_season)
+async def anime_season_handler(message: types.Message, state: FSMContext):
+    await state.update_data(season=message.text.strip())
+    await message.answer("🎬 Sifatini kiriting (masalan: 720p, 1080p, 4K):")
+    await AddAnimeStates.waiting_for_quality.set()
+
+
+@dp.message_handler(state=AddAnimeStates.waiting_for_quality)
+async def anime_quality_handler(message: types.Message, state: FSMContext):
+    await state.update_data(quality=message.text.strip())
+    await message.answer("📡 Kanal nomini kiriting:")
+    await AddAnimeStates.waiting_for_channel_name.set()
+
+
+@dp.message_handler(state=AddAnimeStates.waiting_for_channel_name)
+async def anime_channel_handler(message: types.Message, state: FSMContext):
+    await state.update_data(channel_name=message.text.strip())
+    await message.answer("🎙 Ovoz berganini kiriting:")
+    await AddAnimeStates.waiting_for_dubbed_by.set()
+
+
+@dp.message_handler(state=AddAnimeStates.waiting_for_dubbed_by)
+async def anime_dubbed_handler(message: types.Message, state: FSMContext):
+    await state.update_data(dubbed_by=message.text.strip())
+    await message.answer("🔢 Umumiy qismlar sonini kiriting:")
+    await AddAnimeStates.waiting_for_total_parts.set()
+
+
+@dp.message_handler(state=AddAnimeStates.waiting_for_total_parts)
+async def anime_total_parts_handler(message: types.Message, state: FSMContext):
+    await state.update_data(total_parts=message.text.strip())
+    await message.answer("📸 Reklama postini yuboring (rasm/video/file, caption bilan bo'lishi mumkin):")
+    await AddAnimeStates.waiting_for_poster.set()
 
 @dp.message_handler(content_types=["photo", "video", "document"], state=AddAnimeStates.waiting_for_poster)
 async def anime_poster_handler(message: types.Message, state: FSMContext):
@@ -767,24 +814,41 @@ async def anime_parts_handler(message: types.Message, state: FSMContext):
     await state.update_data(parts_file_ids=parts)
     await message.answer(f"✅ Qism qo‘shildi. Hozircha {len(parts)} ta qism saqlandi.")
 
-@dp.message_handler(lambda m: m.text.lower() == "/done", state=AddAnimeStates.waiting_for_parts)
+@dp.message_handler(commands=["done"], state=AddAnimeStates.waiting_for_parts)
 async def anime_done_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
     code = data["code"]
     title = data["title"]
     poster_file_id = data["poster_file_id"]
-    caption = data["caption"]
     parts_file_ids = data["parts_file_ids"]
+    genre = data.get("genre", "")
+    season = data.get("season", "1")
+    quality = data.get("quality", "")
+    channel_name = data.get("channel_name", "")
+    dubbed_by = data.get("dubbed_by", "")
+    total_parts = data.get("total_parts", 0)
+    
+    # Caption yaratish
+    caption = f"""{title}
+──────────────────────
+➤ Mavsum: {season}
+➤ Qismlar: {len(parts_file_ids)}/{total_parts}
+➤ Sifati: {quality}
+➤ Kanal: {channel_name}
+➤ Janri: {genre}
+➤ Ovoz berdi: {dubbed_by}
+──────────────────────"""
 
-    await add_anime(code, title, poster_file_id, parts_file_ids, caption)
+    await add_anime(code, title, poster_file_id, parts_file_ids, caption, genre, season, quality, channel_name, dubbed_by, total_parts)
 
     await message.answer(
         f"✅ Anime saqlandi!\n\n"
         f"📌 Kod: <b>{code}</b>\n"
         f"📖 Nomi: <b>{title}</b>\n"
-        f"📸 Reklama post caption: {caption}\n"
-        f"🎞 Qismlar soni: {len(parts_file_ids)}",
-        reply_markup=admin_keyboard()
+        f"🎭 Janr: {genre}\n"
+        f"🎞 Qismlar soni: {len(parts_file_ids)}/{total_parts}",
+        reply_markup=admin_keyboard(),
+        parse_mode="HTML"
     )
     await state.finish()
 
