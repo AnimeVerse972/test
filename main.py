@@ -1175,9 +1175,27 @@ async def send_reklama_post(user_id, code):
         await bot.send_message(user_id, "❌ Kod topilmadi.")
         return
 
-    poster_file_id = data["poster_file_id"]
-    caption = data.get("caption", "")
-    poster_type = data.get("poster_type", "photo")  # ✅ yangi
+    # Ma'lumotlarni olish
+    title = data.get("title", "Noma'lum")
+    season = data.get("season", "1")
+    total_parts = data.get("total_parts", "?")
+    quality = data.get("quality", "")
+    channel_name = data.get("channel_name", "")
+    genre = data.get("genre", "")
+    dubbed_by = data.get("dubbed_by", "")
+    poster_file_id = data.get("poster_file_id")
+    poster_type = data.get("poster_type", "photo")
+
+    # ✅ Dinamik caption — har doim yangi
+    caption = f"""{title}
+──────────────────────
+➤ Mavsum: {season}
+➤ Qismlar: {total_parts}
+➤ Sifati: {quality}
+➤ Kanal: {channel_name}
+➤ Janri: {genre}
+➤ Ovoz berdi: {dubbed_by}
+──────────────────────"""
 
     keyboard = InlineKeyboardMarkup().add(
         InlineKeyboardButton("✨Tomosha qilish✨", callback_data=f"download:{code}")
@@ -1185,7 +1203,7 @@ async def send_reklama_post(user_id, code):
 
     try:
         if not poster_file_id:
-            await bot.send_message(user_id, caption or "Anime tayyor!", reply_markup=keyboard)
+            await bot.send_message(user_id, caption, reply_markup=keyboard)
         elif poster_type == "video":
             await bot.send_video(user_id, poster_file_id, caption=caption, reply_markup=keyboard)
         elif poster_type == "document":
