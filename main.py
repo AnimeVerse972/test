@@ -442,14 +442,33 @@ async def add_channel_id(message: types.Message, state: FSMContext):
         await state.finish()
         return
 
-    try:
-        channel_id = int(message.text.strip())
-        await state.update_data(channel_id=channel_id)
-        await KanalStates.waiting_for_channel_link.set()
-        await message.answer("🔗 Endi kanal linkini yuboring (masalan: https://t.me/...):")
-    except ValueError:
-        await message.answer("❗ Faqat sonlardan iborat ID yuboring (masalan: -1001234567890).")
+    raw = message.text.strip()
 
+    # ID formatini to'g'rilash
+    if raw.startswith("-100") and raw[3:].isdigit():
+        channel_id = int(raw)
+    elif raw.isdigit():
+        channel_id = int("-100" + raw)
+    else:
+        await message.answer("❗ Noto‘g‘ri ID. Faqat raqam yuboring (masalan: 1234567890 yoki -1001234567890).")
+        return
+
+    # Botni kanalda adminligini tekshirish
+    try:
+        bot_info = await bot.me
+        bot_member = await bot.get_chat_member(channel_id, bot_info.id)
+        if bot_member.status not in ["administrator", "creator"]:
+            await message.answer("❗ Bot ushbu kanalda admin emas. Avval kanalga botni admin qiling!")
+            return
+    except Exception as e:
+        await message.answer(
+            "❗ Bot kanalda admin emas.avval botni kanalda admin qiling.\n"
+        )
+        return
+
+    await state.update_data(channel_id=channel_id)
+    await KanalStates.waiting_for_channel_link.set()
+    await message.answer("🔗 Endi kanal linkini yuboring (masalan: https://t.me/kanal_nomi):")
 
 # === 2. Kanal linkini qabul qilish va saqlash ===
 @dp.message_handler(state=KanalStates.waiting_for_channel_link)
